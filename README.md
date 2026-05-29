@@ -258,9 +258,8 @@ FOR i = 1 TO n DO
     ENDIF
 ENDFOR
 OUTPUT sum
-```
 
----
+
 
 ## 🎯 Implementation Notes
 
@@ -293,7 +292,6 @@ OUTPUT sum
 - `A --> B` → Flow connection
 - `A -->|label| B` → Labeled connection (Yes/No for conditions)
 
----
 
 ## 📄 License
 
@@ -305,7 +303,7 @@ MIT License - Feel free to use and modify for educational purposes.
 - **Educators** teaching algorithm visualization
 - **Developers** documenting their code logic
 
----
+
 ## Acknowledgements
 
 Special thanks to my teammates for their valuable support and contribution to this project:
@@ -313,5 +311,3 @@ Special thanks to my teammates for their valuable support and contribution to th
 * [Anvi Shah](https://github.com/anvi-sha675)
 * [Diksha Kunwar](https://github.com/dikshakunwar)
 
-
-**Built with ❤️ for the programming community**
