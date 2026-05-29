@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --color-primary: #6366f1;
+  --color-primary-light: #818cf8;
+  --color-success: #22c55e;
+  --color-success-light: #4ade80;
+  --color-error: #ef4444;
+  --color-error-light: #f87171;
+
+  --color-light-bg: #f0f2f5;
+  --color-light-bg2: #e4e7ec;
+  --color-light-text: #1a1a2e;
+  --color-light-text2: #4b5563;
+  --color-light-border: #c9cdd5;
+
+  --color-dark-bg: #0f0f1a;
+  --color-dark-bg2: #1a1a2e;
+  --color-dark-text: #e4e4e7;
+  --color-dark-text2: #a1a1aa;
+  --color-dark-border: #27273a;
+}
+
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+/* Glow effect for dark mode interactive elements */
+.dark .glow {
+  box-shadow: 0 0 15px rgba(129, 140, 248, 0.15);
+}
+.dark .glow:hover {
+  box-shadow: 0 0 20px rgba(129, 140, 248, 0.25);
+}
+
+/* Light mode panel depth */
+.light-panel {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.dark .light-panel {
+  background: var(--color-dark-bg);
+  box-shadow: none;
+}
+
+/* Toolbar buttons */
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--color-light-border);
+  background: transparent;
+  color: var(--color-light-text2);
+  transition: all 0.15s ease;
+}
+.toolbar-btn:hover {
+  background: var(--color-light-border);
+  color: var(--color-light-text);
+}
+.dark .toolbar-btn {
+  border-color: var(--color-dark-border);
+  color: var(--color-dark-text2);
+}
+.dark .toolbar-btn:hover {
+  background: var(--color-dark-bg2);
+}

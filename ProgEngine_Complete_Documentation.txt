@@ -1,0 +1,1150 @@
+================================================================================
+                    PROGENGINE - COMPLETE PROJECT DOCUMENTATION
+                    ==========================================
+              Pseudocode / C / C++ / Python / Java  -->  Flowchart
+================================================================================
+
+If you are reading this project for the first time, this file will give you
+a complete understanding of the entire codebase. Every file, every function,
+every parameter, and the full data flow is explained here.
+
+
+================================================================================
+                              PROJECT OVERVIEW
+================================================================================
+
+ProgEngine is a web application that converts source code into flowcharts.
+
+The user writes code (in Pseudocode, C, C++, Python, or Java), clicks the
+"Generate" button, and the application generates a visual flowchart diagram.
+
+Internally, it works through 6 stages:
+
+   Source Code
+       |
+       v
+   [1. TOKENIZER]    -->  Breaks code into small tokens (words/symbols)
+       |
+       v
+   [2. VALIDATOR]    -->  Checks if syntax is correct (pseudocode only)
+       |
+       v
+   [3. PARSER]       -->  Builds an AST (Abstract Syntax Tree) from tokens
+       |
+       v
+   [4. CFG]          -->  Generates a Control Flow Graph from the AST
+       |
+       v
+   [5. MERMAID]      -->  Converts the CFG into Mermaid diagram code
+       |
+       v
+   [6. EXPLANATION]  -->  Generates a human-readable explanation from the AST
+       |
+       v
+   Flowchart Display + All Pipeline Data (Tokens, AST, CFG, Mermaid Code, Explanation)
+
+
+Tech Stack:
+  - Frontend: React 18 + Vite + Tailwind CSS v4
+  - Backend:  Node.js + Express.js
+  - Editor:   Monaco Editor (the same editor used in VS Code)
+  - Diagrams: Mermaid.js library
+
+
+================================================================================
+                           PROJECT FOLDER STRUCTURE
+================================================================================
+
+ProgEngine/
+|
+|-- backend/                        <-- Server-side code (Node.js + Express)
+|   |-- package.json                <-- Backend dependencies
+|   |-- src/
+|       |-- index.js                <-- Server starts here
+|       |-- routes/
+|       |   |-- flowchartRoutes.js  <-- API endpoint: /api/generate-flowchart
+|       |-- compiler/
+|           |-- lexer.js            <-- Pseudocode tokenizer
+|           |-- genericTokenizer.js <-- C/C++/Java/Python tokenizer
+|           |-- syntaxValidator.js  <-- Syntax checker (pseudocode only)
+|           |-- astBuilder.js       <-- Pseudocode AST builder
+|           |-- controlFlowGenerator.js  <-- Converts AST to CFG
+|           |-- mermaidGenerator.js      <-- Converts CFG to Mermaid code
+|           |-- explanationGenerator.js  <-- Converts AST to explanation text
+|           |-- languages/
+|               |-- cStyleParser.js      <-- C/C++/Java parser
+|               |-- pythonParser.js      <-- Python parser
+|
+|-- frontend/                       <-- Client-side code (React)
+    |-- package.json                <-- Frontend dependencies
+    |-- vite.config.js              <-- Build tool configuration
+    |-- src/
+        |-- main.jsx                <-- App starts here (entry point)
+        |-- App.jsx                 <-- Main layout component
+        |-- components/
+        |   |-- Header.jsx          <-- Top bar with logo + title
+        |   |-- ControlBar.jsx      <-- Language selector + Generate + Clear buttons
+        |   |-- CodeEditor.jsx      <-- Monaco code editor
+        |   |-- FlowchartDisplay.jsx<-- Mermaid flowchart renderer
+        |   |-- NavigationTabs.jsx  <-- Tab buttons (Flowchart, Tokens, AST, etc.)
+        |   |-- PipelineView.jsx    <-- Token/AST/CFG/Mermaid/Explanation display
+        |   |-- ErrorPanel.jsx      <-- Error messages display
+        |   |-- ThemeToggle.jsx     <-- Light/Dark mode toggle button
+        |-- context/
+        |   |-- ThemeContext.jsx     <-- Theme state management (light/dark)
+        |-- hooks/
+        |   |-- useFlowchartGenerator.js  <-- Main logic hook (state + API calls)
+        |-- utils/
+        |   |-- api.js              <-- Backend API call function
+        |-- styles/
+            |-- index.css           <-- Global CSS + Tailwind + Theme colors
+
+
+================================================================================
+                              BACKEND FILES
+================================================================================
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/index.js
+PURPOSE: Server entry point. Creates and starts the Express server.
+--------------------------------------------------------------------------------
+
+What it does:
+  - Creates an Express server on port 3001
+  - Enables CORS (so the frontend can send requests to the backend)
+  - Enables JSON body parsing for incoming requests
+  - Provides a /api/health endpoint for health checks
+  - Delegates all /api routes to flowchartRoutes.js
+  - Has a global error handler that returns 500 errors
+
+Dependencies:
+  - express (web framework)
+  - cors (allows cross-origin requests)
+
+Endpoints:
+  GET  /api/health              -->  Returns { status: 'ok' }
+  POST /api/generate-flowchart  -->  Handled by flowchartRoutes.js
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/routes/flowchartRoutes.js
+PURPOSE: Main API endpoint. Receives code, runs the full compilation pipeline,
+         and returns all results.
+--------------------------------------------------------------------------------
+
+This is the MOST IMPORTANT file in the backend. It orchestrates the entire
+compilation pipeline.
+
+Endpoint: POST /api/generate-flowchart
+
+Request Body:
+  {
+    pseudocode: "user's code" (required),
+    language: "pseudocode" | "c" | "cpp" | "python" | "java" (optional, default: pseudocode)
+  }
+
+What it does step by step:
+  1. Validates that the code is not empty
+  2. Tokenizes the code based on the language:
+     - Pseudocode: Uses tokenize() from lexer.js
+     - Python:     Uses tokenizeGeneric() from genericTokenizer.js
+     - C/C++/Java: Uses tokenizeGeneric() from genericTokenizer.js
+  3. Parses the code based on the language (builds the AST):
+     - Pseudocode: Validates with syntaxValidator.js, then builds AST with astBuilder.js
+     - Python:     Directly parses to AST with pythonParser.js
+     - C/C++/Java: Directly parses to AST with cStyleParser.js
+  4. Generates the Control Flow Graph (CFG) from the AST -- controlFlowGenerator.js
+  5. Generates Mermaid code from the CFG -- mermaidGenerator.js
+  6. Generates a human-readable explanation from the AST -- explanationGenerator.js
+
+Success Response:
+  {
+    success: true,
+    mermaidCode: "flowchart TD\n  A([Start])...",
+    tokens: [...],              <-- array of token objects
+    ast: {...},                 <-- abstract syntax tree
+    cfg: { nodes, edges },      <-- control flow graph
+    explanation: "This program does...",
+    language: "pseudocode"
+  }
+
+Error Response:
+  {
+    success: false,
+    error: { message: "...", line: 5, column: 3 },
+    errors: [...]  (multiple errors possible)
+  }
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/lexer.js
+PURPOSE: Breaks pseudocode into tokens. Only works with pseudocode.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  tokenize(input)
+    - input: string (pseudocode source code)
+    - returns: array of token objects
+
+What is a token?
+  Just like we break English sentences into words, we break code into tokens.
+
+  Example: "SET x = 10" becomes:
+    { type: 'KEYWORD',    value: 'SET', line: 1, column: 1 }
+    { type: 'IDENTIFIER', value: 'x',   line: 1, column: 5 }
+    { type: 'OPERATOR',   value: '=',   line: 1, column: 7 }
+    { type: 'NUMBER',     value: '10',  line: 1, column: 9 }
+
+Token Types:
+  KEYWORD     - Reserved words: IF, ELSE, THEN, ENDIF, WHILE, DO, ENDWHILE,
+                FOR, TO, ENDFOR, SET, INPUT, OUTPUT, PRINT, READ, AND, OR, NOT
+  IDENTIFIER  - Variable names (x, count, sum, etc.)
+  NUMBER      - Numeric literals (10, 3.14, etc.)
+  STRING      - Text enclosed in quotes ("Hello", etc.)
+  OPERATOR    - +, -, *, /, %, =, <, >, ==, !=, <=, >=
+  PUNCTUATION - (, ), comma
+  NEWLINE     - Line break character
+  EOF         - End of file marker
+
+Each token has: { type, value, line, column }
+
+Processing details:
+  - Skips whitespace (spaces and tabs)
+  - Supports line comments (// style)
+  - Handles string literals with opening and closing quotes
+  - Tracks line and column numbers for error reporting
+  - Keyword matching is case-insensitive (if, IF, If all become IF)
+
+Errors thrown:
+  - "Unterminated string literal" - when a string's closing quote is missing
+  - "Unexpected character 'x'"   - when an unrecognized character is found
+
+Helper Functions (internal, not exported):
+  isDigit(ch)        - returns true if character is 0-9
+  isAlpha(ch)        - returns true if character is a-z, A-Z, or underscore
+  isAlphaNumeric(ch) - returns true if character is a letter or digit
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/genericTokenizer.js
+PURPOSE: Breaks C, C++, Java, and Python code into tokens.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  tokenizeGeneric(input, language)
+    - input: string (source code)
+    - language: 'c' | 'cpp' | 'java' | 'python'
+    - returns: array of token objects
+
+Why does this file exist?
+  The lexer.js only knows pseudocode keywords. C/C++/Java/Python have their
+  own keywords (int, void, def, class, etc.), so a separate tokenizer is
+  needed for them.
+
+Each language has its own keyword set:
+  C:      int, float, void, if, else, while, for, return, printf, scanf, etc.
+  C++:    All C keywords + class, cout, cin, namespace, template, bool, etc.
+  Java:   class, public, private, static, System, Scanner, String, etc.
+  Python: def, class, elif, import, print, input, range, len, True, False, etc.
+
+Token Types (same as lexer.js, plus):
+  COMMENT - Both single-line (//, #) and multi-line (/* */) comments
+
+Additional features compared to lexer.js:
+  - Block comment support (/* ... */)
+  - Python # comment support
+  - Escape sequences in strings ("Hello\n")
+  - More operators: &&, ||, ++, --, +=, -=, <<, >>, ->, ::
+  - More punctuation: {, }, [, ], ;, ., #
+
+Helper Functions (internal):
+  isDigit(ch)        - returns true if character is 0-9
+  isAlpha(ch)        - returns true if character is a-z, A-Z, or underscore
+  isAlphaNumeric(ch) - returns true if character is a letter or digit
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/syntaxValidator.js
+PURPOSE: Validates the syntax of pseudocode tokens. Only used for pseudocode.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  validate(tokens)
+    - tokens: array of token objects
+    - returns: { valid: boolean, errors: array }
+
+What it checks:
+  1. IF must be followed by THEN before the next newline
+  2. WHILE must be followed by DO after the condition
+  3. FOR must be followed by TO and DO
+  4. Every IF must have a matching ENDIF
+  5. Every WHILE must have a matching ENDWHILE
+  6. Every FOR must have a matching ENDFOR
+  7. ELSE can only appear inside an IF block
+
+Algorithm:
+  Uses a stack data structure. When an IF is found, it pushes onto the stack.
+  When ENDIF is found, it pops from the stack. If there is a mismatch, an
+  error is generated.
+
+Example Errors:
+  "IF without matching THEN"
+  "Missing ENDIF for IF at line 3"
+
+Error Structure:
+  { message: string, line: number, column: number }
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/astBuilder.js
+PURPOSE: Builds an Abstract Syntax Tree (AST) from pseudocode tokens.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  buildAST(tokens)
+    - tokens: array of token objects
+    - returns: AST object (tree structure)
+
+What is an AST?
+  A tree representation of the code's structure. For example:
+
+  Code: IF x > 0 THEN OUTPUT "Positive" ENDIF
+
+  AST:
+  {
+    type: "Program",
+    body: [{
+      type: "IfStatement",
+      condition: {
+        type: "BinaryExpression",
+        operator: ">",
+        left: { type: "Identifier", name: "x" },
+        right: { type: "Literal", value: 0 }
+      },
+      thenBlock: [{
+        type: "OutputStatement",
+        expression: { type: "Literal", value: "Positive" }
+      }],
+      elseBlock: null
+    }]
+  }
+
+AST Node Types:
+  Program           - Root node, contains a body[] array of statements
+  Assignment        - Variable assignment (SET x = 10)
+    Properties: variable (string), value (expression node), line (number)
+  IfStatement       - If/else conditional branching
+    Properties: condition (expression), thenBlock[] (statements), elseBlock[] (or null), line
+  WhileStatement    - While loop
+    Properties: condition (expression), body[] (statements), line
+  ForStatement      - For loop
+    Properties: variable (string), start (expression), end (expression), body[] (statements), line
+  InputStatement    - User input (INPUT x)
+    Properties: variable (string), line
+  OutputStatement   - Output/print (OUTPUT "hello")
+    Properties: expression (expression node), line
+  BinaryExpression  - Two operands with an operator (x + 5, a > b)
+    Properties: operator (string), left (expression), right (expression)
+  UnaryExpression   - Single operand with operator (NOT x, -5)
+    Properties: operator (string), operand (expression)
+  Literal           - Constant value (10, "hello", 3.14)
+    Properties: value (number or string), line
+  Identifier        - Variable name reference (x, count)
+    Properties: name (string), line
+
+Parser Functions (internal, not exported):
+  parseProgram()         - Entry point, called first to begin parsing
+  parseStatement()       - Determines which type of statement it is (IF/WHILE/FOR/SET/etc.)
+  parseAssignment()      - Parses: SET x = 10
+  parseIfStatement()     - Parses: IF...THEN...ELSE...ENDIF
+  parseWhileStatement()  - Parses: WHILE...DO...ENDWHILE
+  parseForStatement()    - Parses: FOR...TO...DO...ENDFOR
+  parseInputStatement()  - Parses: INPUT x
+  parseOutputStatement() - Parses: OUTPUT "hello"
+  parseExpression()      - Parses expressions like: x + 5 * 3
+
+Expression Precedence (from highest to lowest priority):
+  1. Unary operators (NOT, -)
+  2. Multiplication/Division/Modulo (*, /, %)
+  3. Addition/Subtraction (+, -)
+  4. Comparison operators (==, !=, <, >, <=, >=)
+  5. Logical AND
+  6. Logical OR
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/languages/cStyleParser.js
+PURPOSE: Parses C, C++, and Java code directly into AST format.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  parseCStyle(code, language)
+    - code: string (C/C++/Java source code)
+    - language: 'c' | 'cpp' | 'java'
+    - returns: AST object
+
+This file is quite complex because C-style languages have complex syntax.
+
+Internal Tokenizer:
+  This file contains its own small tokenizer that breaks code into tokens.
+  Token types: PREPROCESSOR, KEYWORD, IDENT, NUMBER, STRING, OP, PUNCT,
+  COMMENT, EOF
+
+Parser Functions (internal):
+  parseProgram()             - Top-level parsing entry point
+  parseTopLevel()            - Handles function definitions, class declarations, and statements
+  parseStatement()           - Routes based on keyword: if/while/for/do/switch/return/expression
+  parseBlock()               - Parses a { ... } block of statements
+  parseBlockOrSingle()       - Parses either a block or a single statement
+  parseIfStatement()         - Parses if/else if/else chains
+  parseWhileStatement()      - Parses while loops
+  parseDoWhileStatement()    - Parses do { } while() loops
+  parseForStatement()        - Parses for(init; cond; update) loops
+                               (internally converts to a while loop representation)
+  parseSwitchStatement()     - Parses switch/case statements
+                               (internally converts to an if-else chain)
+  parseReturnStatement()     - Handles return statements
+  parseExpressionStatement() - Parses assignments, function calls, etc.
+  parseFunctionDef()         - Extracts function body statements
+  parseClassDecl()           - Extracts class body statements
+
+Statement Classification (how raw code is mapped to AST nodes):
+  printf("hello")           -->  OutputStatement
+  scanf("%d", &x)           -->  InputStatement
+  cout << "hello"           -->  OutputStatement
+  cin >> x                  -->  InputStatement
+  System.out.println("hi")  -->  OutputStatement
+  sc.nextInt()              -->  InputStatement
+  x = 10                    -->  Assignment
+  x++                       -->  Assignment (treated as x = x + 1)
+  int x = 5                 -->  Assignment
+  int x                     -->  Assignment (initialized to 0)
+  x += 5                    -->  Assignment (treated as x = x + 5)
+
+Helper Functions (internal):
+  isFunctionDeclAhead()        - Looks ahead to check if a function declaration follows
+  collectBalanced('(', ')')    - Collects text between matching brackets
+  skipToSemicolon()            - Advances past the next semicolon
+  flattenAST(node)             - Flattens nested block structures
+  classifyStatement(text, ...) - Converts raw text into an AST node
+  extractFuncArgs(text, name)  - Extracts function arguments from text
+  cleanPrintfArgs(content)     - Processes printf format strings
+  splitArgs(text)              - Splits comma-separated arguments
+
+Recognized Type Keywords:
+  void, int, float, double, char, long, short, unsigned, signed,
+  string, String, bool, boolean, auto, const, static, final, abstract, var
+
+Recognized Access Modifiers: public, private, protected
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/languages/pythonParser.js
+PURPOSE: Parses Python code directly into AST format.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  parsePython(code)
+    - code: string (Python source code)
+    - returns: AST object
+
+Python is unique because its blocks are defined by indentation (no curly
+braces). So this parser tracks indentation levels carefully.
+
+Internal Tokenizer:
+  tokenizeLines(lines) - Breaks Python code into logical lines.
+  Each line has: type, indent (indentation level), text, line (number)
+  Token types: COMMENT, EMPTY, LINE, EOF
+
+Parser Functions (internal):
+  parseProgram()              - Entry point for parsing
+  parseStatement(minIndent)   - Determines the type of statement at current position
+  parseBlock(parentIndent)    - Parses an indented block of statements
+  skipBlock(parentIndent)     - Skips over an indented block (used for def/class)
+  parseIfStatement(indent)    - Parses if/elif/else chains
+  parseElifChain(indent)      - Recursively handles elif chains
+  parseWhileStatement(indent) - Parses while loops
+  parseForStatement(indent)   - Parses for loops (see special handling below)
+  parseFunctionDef(indent)    - Skips function definition, extracts body
+  parseReturnStatement()      - Handles return statements
+  parseExpressionLine()       - Classifies a single line of code
+
+Statement Classification:
+  print("hello")              -->  OutputStatement
+  x = input("Enter: ")       -->  InputStatement
+  x = int(input())           -->  InputStatement
+  input("prompt")            -->  InputStatement
+  x = 10                     -->  Assignment
+  x += 5                     -->  Assignment (treated as x = x + 5)
+  func()                     -->  OutputStatement (function call)
+
+For Loop Special Handling:
+  for i in range(n)           -->  ForStatement (start: 0, end: n)
+  for i in range(1, 10)       -->  ForStatement (start: 1, end: 10)
+  for item in list            -->  WhileStatement (with "item in list" as condition)
+
+Constructs that are skipped (not relevant to flowcharts):
+  - import statements
+  - class definitions
+  - try/except/finally blocks
+
+Helper Functions (internal):
+  classifyPythonStatement(text, line) - Classifies a line of Python into an AST node
+  textNode(text)                      - Creates an Identifier node from text
+  flattenAST(node)                    - Flattens nested blocks in the AST
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/controlFlowGenerator.js
+PURPOSE: Converts the AST into a Control Flow Graph (CFG).
+--------------------------------------------------------------------------------
+
+Exported Function:
+  generateCFG(ast)
+    - ast: AST object
+    - returns: { nodes: [...], edges: [...] }
+
+What is a CFG?
+  It is the data structure behind a flowchart. It consists of nodes (the boxes
+  in the flowchart) and edges (the arrows connecting them).
+
+Node Types:
+  start    - Program entry point (displayed as an oval)
+  end      - Program exit point (displayed as an oval)
+  process  - Assignment or computation (displayed as a rectangle)
+  io       - Input or output operation (displayed as a parallelogram)
+  decision - Conditional check (displayed as a diamond)
+  junction - Merge point where branches rejoin (removed during post-processing)
+
+Node Structure:
+  { id: "A", type: "process", label: "x = 10" }
+
+Edge Structure:
+  { from: "A", to: "B", label: null }        <-- simple arrow
+  { from: "C", to: "D", label: "Yes" }       <-- conditional "true" arrow
+  { from: "C", to: "E", label: "No" }        <-- conditional "false" arrow
+
+How each statement type is converted:
+  Assignment      -->  Process node with label "variable = expression"
+  InputStatement  -->  IO node with label "INPUT variable"
+  OutputStatement -->  IO node with label "OUTPUT expression"
+  IfStatement     -->  Decision node with condition as label;
+                       "Yes" branch for the true path, "No" branch for the false path;
+                       merge junction at the end where both branches rejoin
+  WhileStatement  -->  Decision node with condition; body loops back to decision;
+                       "No" branch exits the loop
+  ForStatement    -->  Initialization node + Decision node + body with increment +
+                       loop back edge
+  DoWhileStatement --> Body executes first, then Decision node
+                       ("Yes" loops back, "No" exits)
+
+Post-Processing:
+  removeJunctions() - Removes empty junction nodes by rewiring the edges
+  that pointed to them. This keeps the flowchart clean and simple.
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/mermaidGenerator.js
+PURPOSE: Converts the CFG into Mermaid diagram syntax (text format).
+--------------------------------------------------------------------------------
+
+Exported Function:
+  generateMermaid(cfg)
+    - cfg: { nodes: [...], edges: [...] }
+    - returns: string (Mermaid flowchart code)
+
+What is Mermaid?
+  A library that generates diagrams from text descriptions. This function
+  converts the CFG data structure into Mermaid's text format.
+
+Node Shapes in Mermaid syntax:
+  start/end  -->  A(["Start"])      produces an oval/stadium shape
+  decision   -->  B{"x > 0?"}      produces a diamond shape
+  io         -->  C[/"INPUT x"/]    produces a parallelogram shape
+  process    -->  D["x = 10"]       produces a rectangle shape
+
+Edge Syntax:
+  Simple arrow:     A --> B
+  Arrow with label: A -->|Yes| B
+
+Output Example:
+  flowchart TD
+    A(["Start"])
+    B["x = 10"]
+    C{"x > 0?"}
+    D[/"OUTPUT x"/]
+    E(["End"])
+    A --> B
+    B --> C
+    C -->|Yes| D
+    C -->|No| E
+    D --> E
+
+Helper Function:
+  escape(text, useQuotes) - Escapes special characters (quotes, brackets, etc.)
+  so they don't break the Mermaid syntax.
+
+
+--------------------------------------------------------------------------------
+FILE: backend/src/compiler/explanationGenerator.js
+PURPOSE: Generates a human-readable step-by-step explanation from the AST.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  generateExplanation(ast, language)
+    - ast: AST object
+    - language: string (used for the display label, e.g., "C++" instead of "cpp")
+    - returns: string (step-by-step explanation text)
+
+This function walks through every node in the AST and describes what it does
+in plain English.
+
+Output Example:
+  "This pseudocode program does the following:
+
+  1. Set variable "x" to 10.
+  2. Check if x > 0:
+     If TRUE:
+       3. Display the value of "Positive" to the user.
+     If FALSE:
+       4. Display the value of "Non-positive" to the user.
+
+  --- End of Explanation ---"
+
+How each statement type is explained:
+  Assignment      -->  "Set variable "x" to 10."
+  InputStatement  -->  "Read input from the user and store it in "x"."
+  OutputStatement -->  "Display the value of x to the user."
+  IfStatement     -->  "Check if x > 0:" followed by TRUE and FALSE branches
+  WhileStatement  -->  "Repeat WHILE x < 10:" followed by the loop body
+  DoWhileStatement --> "Do the following, then repeat WHILE x < 10:" followed by the body
+  ForStatement    -->  "Loop with "i" from 1 to 10:" followed by the loop body
+
+Language Labels:
+  pseudocode --> "pseudocode"
+  c          --> "C"
+  cpp        --> "C++"
+  python     --> "Python"
+  java       --> "Java"
+
+Helper Function:
+  exprToString(node) - Converts an AST expression node into readable text.
+  Example: BinaryExpression {left: x, operator: +, right: 5} --> "x + 5"
+
+
+================================================================================
+                              FRONTEND FILES
+================================================================================
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/main.jsx
+PURPOSE: React app entry point. The application starts here.
+--------------------------------------------------------------------------------
+
+What it does:
+  - Creates the React DOM root
+  - Wraps the App inside ThemeProvider (for light/dark mode support)
+  - Renders the App component
+  - Imports global CSS styles
+
+Component Tree:
+  ThemeProvider
+    |-- App
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/App.jsx
+PURPOSE: Main layout component. Defines the entire UI structure.
+--------------------------------------------------------------------------------
+
+This file manages the overall layout of the application.
+
+State Variables:
+  activeTab  - Which tab is currently active (flowchart/tokens/ast/cfg/mermaid/explanation)
+  editorRef  - Reference to the Monaco editor instance (used for jumping to error lines)
+
+From the useFlowchartGenerator hook:
+  code, setCode         - The code written in the editor
+  language              - The currently selected programming language
+  mermaidCode           - The generated Mermaid diagram code
+  tokens                - Tokenization result from the backend
+  ast                   - Abstract Syntax Tree from the backend
+  cfg                   - Control Flow Graph from the backend
+  explanation           - Code explanation from the backend
+  errors                - Array of compilation errors
+  isLoading             - Whether generation is in progress
+  generate, clear       - Functions to generate flowchart or clear everything
+  loadExample           - Function to load a sample code example
+
+Constants:
+  MONACO_LANG_MAP - Maps internal language names to Monaco editor language IDs
+
+Functions:
+  handleErrorClick(line) - When the user clicks on an error, the editor jumps
+                           to that line and focuses the cursor there
+
+Keyboard Shortcuts:
+  Ctrl+Enter / Cmd+Enter - Triggers code generation
+
+Layout Structure:
+  +--------------------------------------------------+
+  |                    HEADER                         |
+  +--------------------------------------------------+
+  |                  |                                |
+  |   CONTROL BAR    |     NAVIGATION TABS            |
+  |                  |  [Flowchart][Tokens][AST]...   |
+  |   CODE EDITOR    |                                |
+  |   (40% width)    |     FLOWCHART DISPLAY          |
+  |                  |     or PIPELINE VIEW            |
+  |                  |     (60% width)                |
+  |                  |                                |
+  +--------------------------------------------------+
+  |                 ERROR PANEL                       |
+  +--------------------------------------------------+
+  |                   FOOTER                          |
+  +--------------------------------------------------+
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/Header.jsx
+PURPOSE: Top navigation bar with the logo, title, and theme toggle button.
+--------------------------------------------------------------------------------
+
+Elements:
+  - Custom SVG logo (an icon showing connected flowchart nodes)
+  - "ProgEngine" title with a gradient text effect
+  - Tagline: "Pseudocode to Flowchart Generator" (hidden on mobile screens)
+  - ThemeToggle button (switches between light and dark mode)
+  - GitHub link button
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/ControlBar.jsx
+PURPOSE: Contains the language selector, Generate button, Clear button,
+         and example code dropdown.
+--------------------------------------------------------------------------------
+
+Props (received from parent):
+  onGenerate       - Callback function when Generate button is clicked
+  onClear          - Callback function when Clear button is clicked
+  onLoadExample    - Callback function when an example is selected (receives example name)
+  isLoading        - When true, shows a loading spinner on the Generate button
+  exampleNames     - Array of available example names for the current language
+  language         - Currently selected language identifier
+  onLanguageChange - Callback function when a different language is selected
+  languageNames    - Array of all available language identifiers
+  languageLabels   - Object mapping language id to display name
+
+Elements:
+  - Language buttons: [Pseudocode] [C] [C++] [Python] [Java]
+    The active language button is highlighted with the primary color
+  - Generate button (with Ctrl+Enter shortcut hint)
+  - Clear button
+  - Examples dropdown (lists available code examples for the current language)
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/CodeEditor.jsx
+PURPOSE: Monaco-based code editor with syntax highlighting, error markers,
+         and multi-language support.
+--------------------------------------------------------------------------------
+
+Props:
+  value     - Current code content (string)
+  onChange  - Callback when the code is modified
+  errors    - Array of error objects (used to show red underlines in the editor)
+  editorRef - Passes the editor instance back to the parent component
+  language  - Monaco language identifier for syntax highlighting
+
+Features:
+  - Custom pseudocode language registration with syntax highlighting
+  - Keywords are highlighted: IF, ELSE, WHILE, FOR, SET, INPUT, OUTPUT, etc.
+  - Error markers: When errors occur, red underlines appear on the specific lines
+  - Custom color themes: progengine-light and progengine-dark
+
+Module Function:
+  registerPseudocodeLanguage(monaco) - Registers a custom pseudocode language
+  with Monaco, including keyword definitions, tokenizer rules, and custom
+  color themes for both light and dark modes.
+
+Editor Configuration:
+  - Font: JetBrains Mono / Fira Code, size 14px
+  - Minimap: disabled
+  - Line numbers: enabled
+  - Word wrap: enabled
+  - Tab size: 4
+  - Bracket pair colorization: enabled
+  - Code suggestions: disabled
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/FlowchartDisplay.jsx
+PURPOSE: Renders Mermaid code into a visual flowchart. Includes zoom controls
+         and export functionality.
+--------------------------------------------------------------------------------
+
+Props:
+  mermaidCode - The Mermaid diagram code to render (string)
+
+State Variables:
+  scale         - Current zoom level (1 = 100%, range: 0.3x to 3x)
+  svgContent    - The rendered SVG HTML content
+  renderError   - Error message if Mermaid rendering fails
+  renderCountRef - Counter used to prevent race conditions when rendering
+
+Functions:
+  renderDiagram(code)  - Asynchronously renders Mermaid code into SVG
+  zoomIn()             - Increases zoom by 0.2 (maximum 3x)
+  zoomOut()            - Decreases zoom by 0.2 (minimum 0.3x)
+  resetZoom()          - Resets zoom to 1x (100%)
+  exportSVG()          - Downloads the flowchart as an SVG file (flowchart.svg)
+  exportPNG()          - Downloads the flowchart as a PNG file at 2x resolution (flowchart.png)
+  copyMermaidCode()    - Copies the raw Mermaid code to the clipboard
+
+Mermaid Configuration:
+  - startOnLoad: false (diagrams are rendered manually)
+  - theme: Matches the app's current theme (dark or default)
+  - Flowchart options: smooth curves, 15px padding, HTML labels
+  - securityLevel: loose (allows HTML in labels)
+
+UI Elements:
+  - Toolbar (shown only when a diagram is rendered):
+    [Zoom Out] [100%] [Zoom In] [Reset]  ........  [Copy Code] [SVG] [PNG]
+  - Diagram area: Scrollable, zoomable SVG display
+  - Empty state: Shows "Write code and click Generate" placeholder message
+  - Error state: Shows the error message with a collapsible view of the raw Mermaid code
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/NavigationTabs.jsx
+PURPOSE: Tab buttons that switch between different pipeline output views.
+--------------------------------------------------------------------------------
+
+Props:
+  activeTab   - The currently active tab ID
+  onTabChange - Callback function when a tab is clicked (receives the new tab ID)
+
+Tabs (in order):
+  1. "Flowchart"          (id: flowchart)   - Shows the rendered flowchart diagram
+  2. "Tokens"             (id: tokens)      - Shows the tokenization output
+  3. "AST"                (id: ast)         - Shows the Abstract Syntax Tree
+  4. "Control Flow Graph" (id: cfg)         - Shows the CFG data
+  5. "Mermaid Code"       (id: mermaid)     - Shows the raw Mermaid code
+  6. "Explanation"        (id: explanation) - Shows the code explanation
+
+Styling:
+  Active tab:   Background #188077 (teal), white text, semibold font weight
+  Inactive tab: Background #E8EEF2 (light gray), dark gray text, medium font weight
+  Hover effect: Inactive tabs darken slightly to #D6DEE4
+  Transition:   200ms smooth color transition
+  Shape:        Fully rounded corners (rounded-xl), padding px-5 py-2.5
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/PipelineView.jsx
+PURPOSE: Displays the data for whichever pipeline tab is active
+         (Tokens, AST, CFG, Mermaid Code, or Explanation).
+--------------------------------------------------------------------------------
+
+Props:
+  activeTab   - Which tab is currently active
+  tokens      - Token array from the backend (or null if not yet generated)
+  ast         - AST object from the backend (or null)
+  cfg         - CFG object from the backend (or null)
+  mermaidCode - Raw Mermaid code string from the backend (or null)
+  explanation - Explanation text from the backend (or null)
+
+Functions:
+  copyToClipboard(text) - Copies the given text to the clipboard
+  renderData(data, label) - Renders data in a formatted, scrollable <pre> block
+
+Behavior:
+  - If data is null: Shows "No [label] data available. Generate code first."
+  - If data is an object: Formats it with JSON.stringify(data, null, 2) for pretty printing
+  - If data is a string: Displays it directly
+  - Every view includes a "Copy" button at the top
+  - Uses monospace font, with word wrapping and scrollable overflow
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/ErrorPanel.jsx
+PURPOSE: Displays compilation errors in a collapsible panel at the bottom.
+--------------------------------------------------------------------------------
+
+Props:
+  errors       - Array of error objects { message, line, column }
+  onErrorClick - Callback when an error is clicked (receives the line number,
+                 so the editor can jump to that line)
+
+State:
+  collapsed - Whether the error list is collapsed or expanded
+
+Behavior:
+  - If there are no errors, the panel is completely hidden (returns null)
+  - Shows the total error count in the header
+  - Has a collapse/expand toggle button
+  - Each error is clickable - clicking jumps the editor to that line
+  - Shows a line number badge for each error (e.g., "L5")
+  - Maximum height of 150px with scrolling for many errors
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/components/ThemeToggle.jsx
+PURPOSE: A button that toggles between light and dark mode.
+--------------------------------------------------------------------------------
+
+Behavior:
+  - In light mode: Shows a moon icon (click to switch to dark mode)
+  - In dark mode: Shows a sun icon (click to switch to light mode)
+  - Has a hover scale animation
+  - Shows a glow effect in dark mode
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/context/ThemeContext.jsx
+PURPOSE: Manages the theme state (light/dark) for the entire application.
+--------------------------------------------------------------------------------
+
+Exports:
+  ThemeProvider({ children }) - Context provider component that wraps the app
+  useTheme()                  - Custom hook to access the theme anywhere in the app
+
+ThemeProvider Component:
+  State:
+    theme - Either 'light' or 'dark' (initialized from localStorage, defaults to 'light')
+
+  Functions:
+    toggleTheme() - Switches between 'light' and 'dark'
+
+  Side Effects:
+    - Adds or removes the 'dark' class on document.documentElement (enables Tailwind dark mode)
+    - Saves the theme to localStorage under the key 'progengine-theme'
+
+useTheme() Hook:
+  Returns: { theme, toggleTheme }
+  Note: Throws an error if used outside of a ThemeProvider
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/hooks/useFlowchartGenerator.js
+PURPOSE: The main logic hook. Manages all code state, language selection,
+         API calls, and generation results.
+--------------------------------------------------------------------------------
+
+This file is the "brain" of the frontend. All state and business logic lives here.
+
+Constants:
+  EXAMPLES - Sample code snippets for each language:
+    pseudocode: Check Positive, Count to 5, Sum Even Numbers, Find Maximum
+    c:          Check Positive, Sum Even Numbers, Find Maximum
+    cpp:        Check Positive, Count to 5, Sum Even Numbers
+    python:     Check Positive, Count to 5, Sum Even Numbers, Find Maximum
+    java:       Check Positive, Find Maximum, Sum Even Numbers
+
+  LANGUAGE_LABELS - Maps language ID to display name:
+    pseudocode --> "Pseudocode"
+    c          --> "C"
+    cpp        --> "C++"
+    python     --> "Python"
+    java       --> "Java"
+
+State Variables:
+  code        - The code written in the editor (string)
+  language    - The selected programming language (string, default: 'pseudocode')
+  mermaidCode - The Mermaid code received from the backend (string)
+  tokens      - Token array received from the backend (array or null)
+  ast         - AST received from the backend (object or null)
+  cfg         - CFG received from the backend (object or null)
+  explanation - Explanation text received from the backend (string or null)
+  errors      - Array of error objects
+  isLoading   - Whether an API call is currently in progress (boolean)
+
+Functions:
+  generate()
+    - Checks that the code is not empty
+    - Sets loading state to true
+    - Calls the backend API with the code and language
+    - On success: stores mermaidCode, tokens, ast, cfg, explanation; clears errors
+    - On failure: stores errors; clears all generation results
+    - Sets loading state to false
+    - Dependencies: [code, language]
+
+  clear()
+    - Resets everything to initial state: code, mermaidCode, tokens, ast, cfg,
+      explanation, and errors are all cleared
+
+  loadExample(name)
+    - Loads a sample code example for the currently selected language
+    - Sets the code to the example; clears all generation results
+    - Dependencies: [language]
+
+  changeLanguage(lang)
+    - Changes the selected language
+    - Clears everything (code is also cleared since different languages have different syntax)
+
+Return Object:
+  {
+    code, setCode,                                       // Code editor state
+    language, changeLanguage,                             // Language selection
+    mermaidCode, tokens, ast, cfg, explanation,          // Generation results
+    errors, isLoading,                                    // Status indicators
+    generate, clear, loadExample,                         // Action functions
+    exampleNames,    // Array of example names for the current language
+    languageNames,   // Array of all language IDs
+    languageLabels   // Object mapping language ID to display label
+  }
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/utils/api.js
+PURPOSE: Handles communication with the backend server.
+--------------------------------------------------------------------------------
+
+Exported Function:
+  generateFlowchart(code, language)
+    - code: string (the source code to process)
+    - language: string (default: 'pseudocode')
+    - returns: Promise<object> (the API response)
+
+Behavior:
+  - Sends a POST request to /api/generate-flowchart
+  - Request body: { pseudocode: code, language: language }
+  - On success: returns the server's JSON response directly
+  - On network error: returns { success: false, error: { message: "Network error..." } }
+
+Note: In development, the /api calls are proxied through Vite's dev server
+(configured in vite.config.js) to http://localhost:3001 where the backend runs.
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/src/styles/index.css
+PURPOSE: Global CSS styles. Includes Tailwind CSS, custom theme colors,
+         and component-specific styles.
+--------------------------------------------------------------------------------
+
+Theme Colors:
+  Primary:       #6366f1 (indigo)
+  Primary Light: #818cf8
+  Success:       #22c55e (green)
+  Error:         #ef4444 (red)
+
+  Light Mode Colors:
+    Background:  #f0f2f5
+    Text:        #1a1a2e
+    Border:      #c9cdd5
+
+  Dark Mode Colors:
+    Background:  #0f0f1a
+    Text:        #e4e4e7
+    Border:      #27273a
+
+Custom CSS Classes:
+  .glow         - Adds a glow box-shadow effect in dark mode
+  .light-panel  - Adds a subtle shadow to panels in light mode
+  .toolbar-btn  - Styling for toolbar buttons (zoom, export, copy buttons)
+
+Scrollbar Customization:
+  - Width: 8px
+  - Custom thumb colors for light and dark modes
+  - Rounded corners
+
+Fonts:
+  - Sans-serif: Inter (used for headings and body text)
+  - Monospace: JetBrains Mono (used in the code editor)
+
+
+--------------------------------------------------------------------------------
+FILE: frontend/vite.config.js
+PURPOSE: Configuration for the Vite build tool and development server.
+--------------------------------------------------------------------------------
+
+Plugins:
+  - react()       - Enables React Fast Refresh (code changes update instantly in the browser)
+  - tailwindcss() - Integrates Tailwind CSS v4
+
+Dev Server Proxy:
+  All /api/* requests are forwarded to http://localhost:3001
+  (The frontend runs on port 5173, the backend on port 3001.
+   The proxy makes it seamless to call the backend from the frontend.)
+
+Optimizations:
+  - The Mermaid library is pre-bundled for faster loading
+
+
+================================================================================
+                     COMPLETE DATA FLOW (End to End)
+================================================================================
+
+Step 1:  The user writes code in the CodeEditor component
+Step 2:  The user clicks "Generate" (or presses Ctrl+Enter)
+Step 3:  App.jsx calls useFlowchartGenerator's generate() function
+Step 4:  generate() calls api.js's generateFlowchart(code, language)
+Step 5:  api.js sends a POST request to /api/generate-flowchart on the backend
+Step 6:  The backend (flowchartRoutes.js) processes the request:
+         a. TOKENIZES the code (lexer.js or genericTokenizer.js)
+         b. VALIDATES syntax (pseudocode only, syntaxValidator.js)
+         c. PARSES code/tokens into an AST (astBuilder.js, cStyleParser.js, or pythonParser.js)
+         d. Generates the CFG from the AST (controlFlowGenerator.js)
+         e. Generates MERMAID CODE from the CFG (mermaidGenerator.js)
+         f. Generates an EXPLANATION from the AST (explanationGenerator.js)
+         g. Sends everything back as a JSON response
+Step 7:  The frontend's generate() receives the response
+Step 8:  State is updated: mermaidCode, tokens, ast, cfg, explanation
+Step 9:  The active tab determines what is displayed:
+         - Flowchart tab   --> FlowchartDisplay renders the Mermaid code into an SVG diagram
+         - Tokens tab      --> PipelineView shows the token array as formatted JSON
+         - AST tab         --> PipelineView shows the AST as formatted JSON
+         - CFG tab         --> PipelineView shows the CFG nodes and edges as JSON
+         - Mermaid tab     --> PipelineView shows the raw Mermaid code as text
+         - Explanation tab --> PipelineView shows the step-by-step explanation text
+
+
+================================================================================
+                        HOW TO RUN THE PROJECT
+================================================================================
+
+Prerequisites:
+  - Node.js must be installed (version 18 or higher)
+  - npm must be installed (comes with Node.js)
+
+Step 1: Start the backend
+  cd backend
+  npm install
+  npm run dev          (starts in development mode with auto-reload)
+  --> Server starts on http://localhost:3001
+
+Step 2: Start the frontend (in a new terminal window)
+  cd frontend
+  npm install
+  npm run dev          (starts in development mode with hot reload)
+  --> App opens on http://localhost:5173
+
+Step 3: Open http://localhost:5173 in your browser
+Step 4: Write code, select a language, and click Generate!
+
+
+================================================================================
+                        DEPENDENCIES SUMMARY
+================================================================================
+
+Backend (package.json):
+  express   ^4.21.0  - Web server framework for handling HTTP requests
+  cors      ^2.8.5   - Middleware for allowing cross-origin requests
+  nodemon   ^3.1.0   - Auto-restarts the server when files change (dev only)
+
+Frontend (package.json):
+  react              ^18.3.1  - JavaScript UI library for building components
+  react-dom          ^18.3.1  - React's DOM rendering engine
+  @monaco-editor/react ^4.6.0 - VS Code-style code editor component
+  mermaid            ^11.4.0  - Library for rendering diagrams from text
+  vite               ^6.0.0   - Fast build tool and development server
+  tailwindcss        ^4.0.0   - Utility-first CSS framework
+  @tailwindcss/vite  ^4.0.0   - Tailwind CSS plugin for Vite
+  @vitejs/plugin-react ^4.3.0 - React support plugin for Vite
+
+
+================================================================================
+                              END OF DOCUMENTATION
+================================================================================
