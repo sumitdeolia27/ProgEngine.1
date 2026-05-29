@@ -308,6 +308,6 @@ MIT License - Feel free to use and modify for educational purposes.
 
 Special thanks to my teammates for their valuable support and contribution to this project:
 
-* [Anvi Shah](https://github.com/anvi-sha675)
+* [Anvesha](https://github.com/anvi-sha675)
 * [Diksha Kunwar](https://github.com/dikshakunwar)
 
