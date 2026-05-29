@@ -306,5 +306,12 @@ MIT License - Feel free to use and modify for educational purposes.
 - **Developers** documenting their code logic
 
 ---
+## Acknowledgements
+
+Special thanks to my teammates for their valuable support and contribution to this project:
+
+* [Anvi Shah](https://github.com/anvi-sha675)
+* [Diksha Kunwar](https://github.com/dikshakunwar)
+
 
 **Built with ❤️ for the programming community**
